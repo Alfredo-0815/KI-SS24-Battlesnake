@@ -15,6 +15,15 @@ import typing
 
 DEBUG = False
 
+class Pos(typing.TypedDict):
+    x: int
+    y: int
+
+type Pos_list = typing.List[Pos]
+type Pos_tuple = typing.Tuple[int, int]
+type reward_map = typing.Dict[Pos_tuple, int]
+        
+
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
 # TIP: If you open your Battlesnake URL in a browser you should see this data
@@ -45,9 +54,10 @@ def end(game_state: typing.Dict):
 # See https://docs.battlesnake.com/api/example-move for available data
 def move(game_state: typing.Dict) -> typing.Dict:
     # return return_move('left', game_state['turn'])
-    w = game_state['board']['width']
-    h = game_state['board']['height']
+    width = game_state['board']['width']
+    height = game_state['board']['height']
     head = game_state['you']['head']
+    tail = game_state['you']['body'][-1]
     turn = game_state['turn']
     # todo: causes errors, but should be safer if it works
     aggressive = True
@@ -55,15 +65,15 @@ def move(game_state: typing.Dict) -> typing.Dict:
     food = find_closest_food(head, game_state['board']['food'])
     exclude = get_danger_positions(game_state, aggressive)
 
-    q = bs(food, head, w, h, exclude)
+    q = bs(food, head, width, height, exclude)
 
-    next_move = decide(head, q, w, h, exclude)
+    next_move = decide(head, tail, q, width, height, exclude)
 
     if DEBUG:
         print_state(
             game_state['you']['body'],
             game_state['board']['food'],
-            q, w, h
+            q, width, height
         )
     
     return return_move(next_move, turn)
@@ -73,17 +83,17 @@ def move(game_state: typing.Dict) -> typing.Dict:
 # elementary functions
 
 
-def calculate_distance(p1, p2):
+def calculate_distance(p1: Pos, p2: Pos) -> int:
     return abs(p1['x'] - p2['x']) + abs(p1['y'] - p2['y'])
 
 
-def out_of_bounds(pos, width, height):
+def out_of_bounds(pos: Pos, width: int, height: int) -> bool:
     if pos['x'] < 0 or pos['x'] >= width or pos['y'] < 0 or pos['y'] >= height:
         return True
     return False
 
 
-def moore_nb(pos, width, height):
+def moore_nb(pos: Pos, width: int, height: int) -> Pos_list:
     nbs = [{
         'x': pos['x'] - 1,
         'y': pos['y']
@@ -116,7 +126,7 @@ def moore_nb(pos, width, height):
     return valid_nbs
 
 
-def von_neumann_nb(pos, width, height):
+def von_neumann_nb(pos: Pos, width: int, height: int) -> Pos_list:
     nbs = [
         {
             'x': pos['x'] - 1,
@@ -142,7 +152,7 @@ def von_neumann_nb(pos, width, height):
     return valid_nbs
 
 
-def return_move(move, turn):
+def return_move(move: str, turn: int) -> typing.Dict:
     print(f"MOVE {turn}: {move}")
     return {"move": move}
 
@@ -151,16 +161,16 @@ def return_move(move, turn):
 # helper functions
 
 
-def pos_to_tuple(pos):
+def pos_to_tuple(pos: Pos) -> Pos_tuple:
     return (pos['x'], pos['y'])
 
 
-def pos_to_dict(pos):
+def pos_to_dict(pos: Pos_tuple) -> Pos:
     return {'x': pos[0], 'y': pos[1]}
 
 
 # backwards-chaining
-def find_closest_food(head, foods):
+def find_closest_food(head: Pos, foods: Pos_list) -> Pos:
     min_dist = None
     min_i = None
     for i, food in enumerate(foods):
@@ -172,7 +182,7 @@ def find_closest_food(head, foods):
     return foods[min_i]
 
 
-def get_danger_positions(game_state: typing.Dict, agressive=False):
+def get_danger_positions(game_state: typing.Dict, agressive=False) -> Pos_list:
     positions = game_state['board']['hazards']
     for snake in game_state['board']['snakes']:
         positions = positions + snake['body']
@@ -184,14 +194,20 @@ def get_danger_positions(game_state: typing.Dict, agressive=False):
     return positions
 
 
-def get_possible_moves(body, width, height):
+def get_possible_moves(body: Pos_list, width: int, height: int) -> Pos_list:
     moves = von_neumann_nb(body[0], width, height)
     if body[1] in moves:
         moves.remove(body[1])
     return moves
 
 
-def get_possible_moves2(head, exclude, width, height):
+def get_possible_moves2(
+    head: Pos,
+    exclude: Pos_list,
+    width: int,
+    height: int
+) -> Pos_list:
+    
     moves = von_neumann_nb(head, width, height)
     for cell in exclude:
         if cell in moves:
@@ -199,7 +215,17 @@ def get_possible_moves2(head, exclude, width, height):
     return moves
 
 
+# works for dict and tuple, returns string or None
+# Union is either one or the other
+# def get_direction(
+#    start: typing.Union[Pos_tuple, Pos],
+#    fin: typing.Union[Pos_tuple, Pos]
+#) -> typing.Optional[str]:
 def get_direction(start, fin):
+    # if type(start) == Pos:
+    #     start = pos_to_tuple(start)
+    # if type(fin) == Pos:
+    #     fin = pos_to_tuple(fin)
     if type(start) != tuple:
         start = pos_to_tuple(start)
     if type(fin) != tuple:
@@ -217,7 +243,14 @@ def get_direction(start, fin):
     return None
 
 
-def decide(head, q, width, height, exclude):
+def decide(
+    head: Pos,
+    tail: Pos,
+    q: reward_map,
+    width: int,
+    height: int,
+    exclude: Pos_list
+):
     best_cell = None
     best_value = None
     for cell in map(pos_to_tuple, von_neumann_nb(head, width, height)):
@@ -237,8 +270,15 @@ def decide(head, q, width, height, exclude):
     # search algorythm could not reach head
     naive_moves = get_possible_moves2(head, exclude, width, height)
     if naive_moves:
-        cell = random.choice(naive_moves)
-        naive_move = get_direction(head, cell)
+        # cell = random.choice(naive_moves)
+        # move in direction of tail
+        for cell in naive_moves:
+            val = calculate_distance(cell, tail)
+            if not best_cell or val < best_value:
+                best_value = val
+                best_cell = cell
+                
+        naive_move = get_direction(head, best_cell)
         if naive_move:
             return naive_move
         print('Warning: naive move out of reach')
@@ -246,12 +286,20 @@ def decide(head, q, width, height, exclude):
         print('Warning: naive move not available')
     return 'down'
 
-def print_state(body, food, q, w, h):
-    moves = von_neumann_nb(body[0], w, h)
-    for line in range(h):
-        y = h - line - 1
+    
+def print_state(
+    body: Pos_list,
+    food: Pos,
+    q: reward_map,
+    width: int,
+    height: int
+) -> None:
+    
+    moves = von_neumann_nb(body[0], width, height)
+    for line in range(height):
+        y = height - line - 1
         s = '|'
-        for x in range(w):
+        for x in range(width):
             cell = {'x': x, 'y': y}
             cell_t = pos_to_tuple(cell)
             if cell == body[0]:
@@ -277,7 +325,14 @@ def print_state(body, food, q, w, h):
 # search algorythms
 
 
-def bs(start, goal, width, height, exclude):
+def bs(
+    start: Pos,
+    goal: Pos,
+    width: int,
+    height: int, 
+    exclude: Pos_list
+) -> reward_map:
+    
     current_cells = [start]
     nb_cells = []
     count = 1
