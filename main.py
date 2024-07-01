@@ -52,15 +52,11 @@ def move(game_state: typing.Dict) -> typing.Dict:
     # todo: causes errors, but should be safer if it works
     aggressive = True
 
-    # return return_move('right', turn)
     food = find_closest_food(head, game_state['board']['food'])
     exclude = get_danger_positions(game_state, aggressive)
 
-    # return return_move('left', turn)
     q = bs(food, head, w, h, exclude)
-    # q = bs(game_state['board']['food'][0], head, w, h, exclude)
 
-    # return return_move('right', turn)
     next_move = decide(head, q, w, h, exclude)
 
     if DEBUG:
@@ -199,10 +195,7 @@ def get_possible_moves2(head, exclude, width, height):
     moves = von_neumann_nb(head, width, height)
     for cell in exclude:
         if cell in moves:
-            # print(f'Info: {cell} removed from possible moves')
             moves.remove(cell)
-
-    # print(f'Info: {moves=}')
     return moves
 
 
@@ -241,6 +234,7 @@ def decide(head, q, width, height, exclude):
     else:
         print('Warning: no move selected')
 
+    # search algorythm could not reach head
     naive_moves = get_possible_moves2(head, exclude, width, height)
     if naive_moves:
         cell = random.choice(naive_moves)
@@ -284,16 +278,11 @@ def print_state(body, food, q, w, h):
 
 
 def bs(start, goal, width, height, exclude):
-    # todo: count
     current_cells = [start]
     nb_cells = []
     count = 1
     q = {pos_to_tuple(start): 0}
 
-    # todo: no endless while loop
-    # while True:
-    # for i in range(width*height):
-    # for i in range((width//3)*2):
     loops = width
     if width > 11:
         loops = 13
