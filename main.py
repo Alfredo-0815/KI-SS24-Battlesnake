@@ -10,6 +10,8 @@
 # To get you started we've included code to prevent your Battlesnake from moving backwards.
 # For more info see docs.battlesnake.com
 
+# server url: https://251701fd-a090-436e-8bcf-fb14f05715c2-00-22uyfy88akjmy.spock.replit.dev/
+
 import random
 import typing
 
